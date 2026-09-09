@@ -156,17 +156,22 @@ import {
    PASTE YOUR FIREBASE CONFIG HERE
    Firebase Console → Project settings → Your apps → Web app
    ========================================================== */
+  import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
 const firebaseConfig = {
-  apiKey: "PASTE_YOUR_API_KEY",
-  authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
-  projectId: "PASTE_YOUR_PROJECT_ID",
-  storageBucket: "PASTE_YOUR_PROJECT.firebasestorage.app",
-  messagingSenderId: "PASTE_YOUR_SENDER_ID",
-  appId: "PASTE_YOUR_APP_ID"
+ apiKey: "AIzaSyCQAMdCX8NNIBOyC7WCrkp6GamL6ryv-6g",
+  authDomain: "my-ai-qa-d6e10.firebaseapp.com",
+  projectId: "my-ai-qa-d6e10",
+  storageBucket: "my-ai-qa-d6e10.firebasestorage.app",
+  messagingSenderId: "577375821722",
+  appId: "1:577375821722:web:09e6ea39a54a68756d6423",
+  measurementId: "G-5HGVXWRKDG",
 };
+  const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
 
 /* Change this password before publishing. */
-const ADMIN_PASSWORD = "admin123";
+const ADMIN_PASSWORD = "nima123";
 
 let db;
 let currentUserId = getUserId();
