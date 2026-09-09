@@ -266,7 +266,7 @@ async function sendQuestion(){
       status: "waiting",
       createdAt: serverTimestamp()
     });
-    addMessage("Question sent. Please wait for the admin to answer.", "assistant");
+    
   }catch(error){
     console.error(error);
     addMessage("Sorry, your question could not be sent.", "assistant");
