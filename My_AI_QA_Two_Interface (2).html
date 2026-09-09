@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My AI Q&A</title>
+
+<!--
+IMPORTANT:
+This version uses Firebase Firestore so two different devices can communicate.
+
+SETUP:
+1. Create a Firebase project at https://console.firebase.google.com/
+2. Create a Web App.
+3. Enable Firestore Database.
+4. Copy your Firebase web configuration into firebaseConfig below.
+5. For a simple demo, configure Firestore rules as described in the message accompanying this file.
+-->
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,Helvetica,sans-serif;background:#212121;color:#fff;height:100vh;overflow:hidden}
+button,input,textarea{font:inherit}
+.app{display:flex;height:100vh}
+.sidebar{width:260px;background:#171717;padding:15px;display:flex;flex-direction:column}
+.logo{font-size:20px;font-weight:bold;padding:15px 10px 25px}
+.side-btn{width:100%;padding:12px;background:#2f2f2f;color:#fff;border:1px solid #555;border-radius:8px;cursor:pointer;text-align:left;font-size:15px;margin-bottom:10px}
+.side-btn:hover{background:#3d3d3d}
+.admin-button{margin-top:auto;background:#10a37f;border:0;text-align:center}
+.admin-button:hover{background:#0d8f6f}
+.main{flex:1;display:flex;flex-direction:column;height:100vh}
+.header{height:60px;border-bottom:1px solid #444;display:flex;align-items:center;padding:0 25px;font-size:18px;font-weight:bold}
+.status{margin-left:auto;font-size:12px;color:#aaa;font-weight:normal}
+.chat{flex:1;overflow-y:auto;padding:35px 15%}
+.message{display:flex;gap:14px;margin-bottom:28px;line-height:1.6}
+.avatar{min-width:34px;height:34px;border-radius:50%;background:#10a37f;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold}
+.message-content{max-width:80%;white-space:pre-wrap;overflow-wrap:anywhere}
+.user{justify-content:flex-end}
+.user .message-content{background:#2f2f2f;padding:12px 18px;border-radius:18px}
+.user .avatar{background:#555}
+.input-area{padding:15px 15%;border-top:1px solid #333}
+.input-box{display:flex;align-items:center;background:#2f2f2f;border:1px solid #555;border-radius:15px;padding:7px}
+textarea{flex:1;background:transparent;border:0;outline:0;resize:none;color:#fff;padding:10px;font-size:16px;height:45px}
+textarea::placeholder{color:#999}
+.send{width:42px;height:42px;border:0;border-radius:10px;background:#10a37f;color:#fff;font-size:20px;cursor:pointer}
+.send:hover{background:#0d8f6f}
+.disclaimer{text-align:center;color:#888;font-size:12px;margin-top:8px}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;justify-content:center;align-items:center}
+.box{width:90%;max-width:850px;max-height:90vh;overflow-y:auto;background:#2a2a2a;border-radius:12px;padding:25px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.header-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.close{background:#444;color:#fff;border:0;width:35px;height:35px;border-radius:8px;cursor:pointer;font-size:18px}
+.form-group{margin-bottom:15px}
+label{display:block;margin-bottom:7px;color:#ddd}
+input, .box textarea{width:100%;background:#171717;color:#fff;border:1px solid #555;border-radius:8px;padding:12px;font-size:15px}
+.box textarea{height:100px;resize:vertical}
+.primary{background:#10a37f;color:#fff;border:0;padding:12px 20px;border-radius:8px;cursor:pointer}
+.secondary{background:#555;color:#fff;border:0;padding:10px 14px;border-radius:8px;cursor:pointer}
+.danger{background:#b33;color:#fff;border:0;padding:8px 12px;border-radius:6px;cursor:pointer}
+.copy{background:#2864d7;color:#fff;border:0;padding:10px 14px;border-radius:8px;cursor:pointer}
+.card{background:#171717;border:1px solid #444;border-radius:10px;padding:15px;margin-bottom:12px}
+.card-q{font-weight:bold;margin-bottom:8px}
+.card-a{color:#bbb;white-space:pre-wrap;margin-bottom:12px}
+.card-actions{display:flex;gap:8px;flex-wrap:wrap}
+.link-box{display:flex;gap:8px;margin:10px 0 20px}
+.link-box input{flex:1}
+.notice{background:#202d29;border:1px solid #345c50;padding:12px;border-radius:8px;color:#ddd;margin-bottom:15px}
+.hidden{display:none!important}
+.empty{color:#999;padding:20px 0;text-align:center}
+@media(max-width:700px){
+.sidebar{display:none}
+.chat{padding:25px 15px}
+.input-area{padding:10px 15px}
+.message-content{max-width:85%}
+.box{width:95%;padding:18px}
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="logo">🤖 My AI Q&A</div>
+  <button class="side-btn" onclick="newChat()">＋ New chat</button>
+  <button class="side-btn admin-button" onclick="openAdmin()">⚙ Manage / Admin</button>
+</aside>
+
+<main class="main">
+  <header class="header">
+    <span id="pageTitle">Ask a Question</span>
+    <span class="status" id="connectionStatus">Connecting...</span>
+  </header>
+
+  <section class="chat" id="chat">
+    <div class="message assistant">
+      <div class="avatar">AI</div>
+      <div class="message-content">Hello! Ask me a question. Your question will be sent to the admin.</div>
+    </div>
+  </section>
+
+  <div class="input-area">
+    <div class="input-box">
+      <textarea id="question" placeholder="Ask your question..." onkeydown="handleKey(event)"></textarea>
+      <button class="send" onclick="sendQuestion()">↑</button>
+    </div>
+    <div class="disclaimer">Questions and answers are synchronized online.</div>
+  </div>
+</main>
+</div>
+
+<!-- ADMIN PANEL -->
+<div class="overlay" id="adminPanel">
+<div class="box">
+  <div class="header-row">
+    <h2>👨‍💻 Admin Panel</h2>
+    <button class="close" onclick="closeAdmin()">✕</button>
+  </div>
+
+  <div class="notice">
+    Admin mode lets you see questions from users and send an answer back to the selected user.
+  </div>
+
+  <div class="form-group">
+    <label>Admin password</label>
+    <input id="adminPassword" type="password" placeholder="Enter admin password">
+  </div>
+  <button class="primary" onclick="loginAdmin()">Login</button>
+
+  <div id="adminContent" class="hidden">
+    <hr style="border-color:#444;margin:20px 0">
+
+    <h3>Shareable User Link</h3>
+    <div class="link-box">
+      <input id="shareLink" readonly>
+      <button class="copy" onclick="copyLink()">Copy</button>
+    </div>
+
+    <div class="notice">
+      Send this link to your friend. They can open it on their phone or computer and ask questions.
+    </div>
+
+    <h3 style="margin:20px 0 12px">Incoming Questions</h3>
+    <div id="questionList"></div>
+  </div>
+</div>
+</div>
+
+<!-- FIREBASE -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, doc, updateDoc, onSnapshot,
+  query, orderBy, serverTimestamp, deleteDoc
+} from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+
+/* ==========================================================
+   PASTE YOUR FIREBASE CONFIG HERE
+   Firebase Console → Project settings → Your apps → Web app
+   ========================================================== */
+const firebaseConfig = {
+  apiKey: "PASTE_YOUR_API_KEY",
+  authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
+  projectId: "PASTE_YOUR_PROJECT_ID",
+  storageBucket: "PASTE_YOUR_PROJECT.firebasestorage.app",
+  messagingSenderId: "PASTE_YOUR_SENDER_ID",
+  appId: "PASTE_YOUR_APP_ID"
+};
+
+/* Change this password before publishing. */
+const ADMIN_PASSWORD = "admin123";
+
+let db;
+let currentUserId = getUserId();
+let adminLoggedIn = false;
+let unsubscribeQuestions = null;
+let editingId = null;
+
+window.sendQuestion = sendQuestion;
+window.newChat = newChat;
+window.openAdmin = openAdmin;
+window.closeAdmin = closeAdmin;
+window.loginAdmin = loginAdmin;
+window.copyLink = copyLink;
+window.answerQuestion = answerQuestion;
+window.deleteQuestion = deleteQuestion;
+window.editAnswer = editAnswer;
+window.handleKey = handleKey;
+
+try {
+  if (firebaseConfig.apiKey.startsWith("PASTE_")) {
+    setStatus("Add Firebase config");
+  } else {
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    setStatus("● Online");
+    startUserListener();
+  }
+} catch (error) {
+  console.error(error);
+  setStatus("Connection error");
+}
+
+function getUserId(){
+  const params = new URLSearchParams(location.search);
+  let id = params.get("user");
+  if (!id) {
+    id = localStorage.getItem("myAIUserId");
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem("myAIUserId", id);
+    }
+  }
+  return id;
+}
+
+function setStatus(text){
+  document.getElementById("connectionStatus").textContent = text;
+}
+
+function escapeHTML(text){
+  const div = document.createElement("div");
+  div.textContent = text ?? "";
+  return div.innerHTML;
+}
+
+function addMessage(text, type){
+  const chat = document.getElementById("chat");
+  const message = document.createElement("div");
+  message.className = "message " + type;
+
+  if(type === "assistant"){
+    message.innerHTML = `
+      <div class="avatar">AI</div>
+      <div class="message-content">${escapeHTML(text)}</div>`;
+  } else {
+    message.innerHTML = `
+      <div class="message-content">${escapeHTML(text)}</div>
+      <div class="avatar">YOU</div>`;
+  }
+
+  chat.appendChild(message);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+async function sendQuestion(){
+  const input = document.getElementById("question");
+  const question = input.value.trim();
+  if(!question) return;
+
+  if(!db){
+    alert("Firebase is not configured yet. Add your Firebase configuration in the code.");
+    return;
+  }
+
+  addMessage(question, "user");
+  input.value = "";
+
+  try{
+    await addDoc(collection(db, "questions"), {
+      userId: currentUserId,
+      question: question,
+      answer: "",
+      status: "waiting",
+      createdAt: serverTimestamp()
+    });
+    addMessage("Question sent. Please wait for the admin to answer.", "assistant");
+  }catch(error){
+    console.error(error);
+    addMessage("Sorry, your question could not be sent.", "assistant");
+  }
+}
+
+function startUserListener(){
+  if(!db) return;
+
+  const q = query(collection(db, "questions"), orderBy("createdAt", "asc"));
+
+  onSnapshot(q, snapshot => {
+    snapshot.docChanges().forEach(change => {
+      if(change.type !== "modified") return;
+
+      const data = change.doc.data();
+
+      if(data.userId === currentUserId && data.answer){
+        const alreadyShown = document.querySelector(
+          `[data-answer-id="${change.doc.id}"]`
+        );
+        if(!alreadyShown){
+          const chat = document.getElementById("chat");
+          const message = document.createElement("div");
+          message.className = "message assistant";
+          message.dataset.answerId = change.doc.id;
+          message.innerHTML = `
+            <div class="avatar">AI</div>
+            <div class="message-content">${escapeHTML(data.answer)}</div>`;
+          chat.appendChild(message);
+          chat.scrollTop = chat.scrollHeight;
+        }
+      }
+    });
+  });
+}
+
+function newChat(){
+  document.getElementById("chat").innerHTML = `
+    <div class="message assistant">
+      <div class="avatar">AI</div>
+      <div class="message-content">Hello! Ask me a question. Your question will be sent to the admin.</div>
+    </div>`;
+}
+
+function handleKey(event){
+  if(event.key === "Enter" && !event.shiftKey){
+    event.preventDefault();
+    sendQuestion();
+  }
+}
+
+function openAdmin(){
+  document.getElementById("adminPanel").style.display = "flex";
+  document.getElementById("shareLink").value =
+    location.origin + location.pathname + "?user=" + encodeURIComponent(currentUserId);
+
+  if(adminLoggedIn) startAdminListener();
+}
+
+function closeAdmin(){
+  document.getElementById("adminPanel").style.display = "none";
+}
+
+function loginAdmin(){
+  const password = document.getElementById("adminPassword").value;
+
+  if(password !== ADMIN_PASSWORD){
+    alert("Wrong admin password.");
+    return;
+  }
+
+  adminLoggedIn = true;
+  document.getElementById("adminContent").classList.remove("hidden");
+  document.getElementById("adminPassword").value = "";
+  startAdminListener();
+}
+
+function startAdminListener(){
+  if(!db) return;
+
+  if(unsubscribeQuestions) unsubscribeQuestions();
+
+  const q = query(collection(db, "questions"), orderBy("createdAt", "desc"));
+
+  unsubscribeQuestions = onSnapshot(q, snapshot => {
+    const list = document.getElementById("questionList");
+    list.innerHTML = "";
+
+    if(snapshot.empty){
+      list.innerHTML = '<div class="empty">No questions yet.</div>';
+      return;
+    }
+
+    snapshot.forEach(item => {
+      const data = item.data();
+
+      const card = document.createElement("div");
+      card.className = "card";
+
+      const time = data.createdAt?.toDate
+        ? data.createdAt.toDate().toLocaleString()
+        : "Just now";
+
+      card.innerHTML = `
+        <div class="card-q">Q: ${escapeHTML(data.question)}</div>
+        <div style="color:#777;font-size:12px;margin-bottom:10px">
+          User: ${escapeHTML(data.userId)}<br>${escapeHTML(time)}
+        </div>
+        <div class="card-a">
+          A: ${escapeHTML(data.answer || "Waiting for answer...")}
+        </div>
+        <div class="card-actions">
+          <button class="primary"
+            onclick="answerQuestion('${item.id}')">
+            ${data.answer ? "Change Answer" : "Answer"}
+          </button>
+          <button class="danger"
+            onclick="deleteQuestion('${item.id}')">
+            Delete
+          </button>
+        </div>`;
+
+      list.appendChild(card);
+    });
+  });
+}
+
+async function answerQuestion(id){
+  if(!db) return;
+
+  const answer = prompt("Write your answer:");
+
+  if(answer === null || !answer.trim()) return;
+
+  try{
+    await updateDoc(doc(db, "questions", id), {
+      answer: answer.trim(),
+      status: "answered",
+      answeredAt: serverTimestamp()
+    });
+  }catch(error){
+    console.error(error);
+    alert("Could not send the answer.");
+  }
+}
+
+async function editAnswer(id, oldAnswer){
+  const answer = prompt("Edit answer:", oldAnswer);
+  if(answer === null || !answer.trim()) return;
+
+  await updateDoc(doc(db, "questions", id), {
+    answer: answer.trim(),
+    status: "answered",
+    answeredAt: serverTimestamp()
+  });
+}
+
+async function deleteQuestion(id){
+  if(!confirm("Delete this question?")) return;
+
+  try{
+    await deleteDoc(doc(db, "questions", id));
+  }catch(error){
+    console.error(error);
+    alert("Could not delete the question.");
+  }
+}
+
+async function copyLink(){
+  const link = document.getElementById("shareLink").value;
+
+  try{
+    await navigator.clipboard.writeText(link);
+    alert("User link copied!");
+  }catch{
+    alert("Copy failed. Select and copy the link manually.");
+  }
+}
+</script>
+</body>
+</html>
